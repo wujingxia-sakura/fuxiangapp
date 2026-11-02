@@ -3142,3 +3142,398 @@ html[data-reduce="1"] .sheet-panel { animation: none; }
   .scene-layer .clouds::before,
   .scene-layer .clouds::after { filter: blur(18px); }
 }
+
+/* ---------- v2.0：海报式首页 + 心情天气 + 留言 + 编辑上下文 ---------- */
+
+:root { --max-home: 1080px; }
+
+.app { max-width: var(--max-home); }
+
+#viewReview,
+#viewSettings {
+  width: 100%;
+  max-width: 720px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* 首页：竖屏海报，横屏双栏 */
+.today-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.today-left,
+.today-right { min-width: 0; }
+
+.today-left {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.scene-poster {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: 24px;
+  overflow: hidden;
+  border: 1px solid rgba(244, 239, 230, 0.12);
+  background: linear-gradient(160deg, var(--s1, #1a2a24), var(--s2, #0b0e14));
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.4);
+  isolation: isolate;
+}
+
+.poster-image {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center 45%;
+  background-repeat: no-repeat;
+}
+
+.poster-image.poster-in { animation: posterIn 0.9s ease both; }
+
+@keyframes posterIn {
+  from { opacity: 0.35; transform: scale(1.03); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.poster-shade {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top, rgba(4, 6, 10, 0.82), rgba(4, 6, 10, 0.08) 55%, rgba(4, 6, 10, 0.18));
+}
+
+.poster-text {
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  bottom: 14px;
+  z-index: 2;
+}
+
+.poster-scene {
+  display: block;
+  color: var(--faint);
+  font-size: 0.68rem;
+  letter-spacing: 0.2em;
+  margin-bottom: 4px;
+}
+
+.poster-text .scene-caption {
+  margin: 0;
+  color: var(--text);
+  font-family: var(--serif);
+  font-size: 0.9rem;
+  line-height: 1.6;
+  letter-spacing: 0.02em;
+  opacity: 0.94;
+  text-shadow: 0 1px 12px rgba(0, 0, 0, 0.65);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.surface-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  align-self: flex-start;
+  padding: 8px 12px;
+  margin-bottom: 10px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: rgba(10, 14, 22, 0.5);
+  color: var(--muted);
+  font-size: 0.78rem;
+  letter-spacing: 0.06em;
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+
+.surface-btn span { color: var(--accent); }
+
+.surface-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text);
+  border-color: rgba(242, 192, 122, 0.4);
+}
+
+.today-right .weather-ribbon { margin-top: 0; }
+
+/* 首页背景：模糊成环境的颜色，海报保持清晰 */
+.scene-host { transition: filter 0.8s ease, transform 0.8s ease; }
+
+body.has-poster .scene-host {
+  filter: blur(26px) brightness(0.5) saturate(0.85);
+  transform: scale(1.08);
+}
+
+body.has-poster .scene-host .particles { display: none; }
+
+/* 横屏 / 桌面：左海报，右时间线 */
+@media (min-width: 760px) {
+  .today-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr);
+    gap: 28px;
+    align-items: start;
+  }
+  .today-left {
+    position: sticky;
+    top: 26px;
+  }
+  .scene-poster { aspect-ratio: 4 / 3; }
+  .composer {
+    position: sticky;
+    left: auto;
+    right: auto;
+    bottom: auto;
+    top: 12px;
+    transform: none;
+    width: 100%;
+    margin: 0 0 16px;
+    z-index: 20;
+  }
+}
+
+/* 泡泡详情：场景照片 + 留言 + 编辑上下文 */
+.bubble-scene {
+  opacity: 0.55;
+  filter: saturate(0.9) brightness(0.75);
+}
+
+.bubble-scene::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to bottom, rgba(4, 6, 10, 0.55), rgba(4, 6, 10, 0.84));
+}
+
+#bubbleOverlay { background: rgba(4, 6, 10, 0.86); }
+#bubbleOverlay .overlay-panel { background: rgba(10, 14, 22, 0.94); }
+
+.bubble-scene-line {
+  margin-top: 4px;
+  color: var(--faint);
+  font-family: var(--serif);
+  font-size: 0.75rem;
+  line-height: 1.5;
+}
+
+.bubble-comments {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.comments-title {
+  color: var(--faint);
+  font-size: 0.68rem;
+  letter-spacing: 0.18em;
+  margin-bottom: 8px;
+}
+
+.comments-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.comment-item {
+  position: relative;
+  padding: 9px 30px 9px 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(244, 239, 230, 0.08);
+}
+
+.comment-text {
+  margin: 0;
+  font-family: var(--serif);
+  font-size: 0.88rem;
+  line-height: 1.7;
+  color: var(--text);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.comment-time {
+  display: block;
+  margin-top: 4px;
+  color: var(--faint);
+  font-size: 0.66rem;
+}
+
+.comment-del {
+  position: absolute;
+  right: 6px;
+  top: 6px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  color: var(--faint);
+  font-size: 0.8rem;
+  line-height: 1;
+}
+
+.comment-del:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text);
+}
+
+.comments-empty {
+  color: var(--faint);
+  font-size: 0.8rem;
+  line-height: 1.7;
+  margin: 0 0 8px;
+}
+
+.comment-form {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.comment-input {
+  flex: 1;
+  min-width: 0;
+  padding: 9px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+  font-family: var(--serif);
+  font-size: 0.86rem;
+  outline: 0;
+}
+
+.comment-input:focus { border-color: rgba(242, 192, 122, 0.45); }
+
+.comment-send {
+  flex: 0 0 auto;
+  padding: 0 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(242, 192, 122, 0.3);
+  background: rgba(242, 192, 122, 0.18);
+  color: var(--accent);
+  font-size: 0.8rem;
+}
+
+.comment-send:hover { background: rgba(242, 192, 122, 0.28); }
+
+.edit-context {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.context-chip {
+  padding: 7px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.context-chip:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text);
+}
+
+.edit-hint {
+  color: var(--faint);
+  font-size: 0.72rem;
+  line-height: 1.6;
+  margin: 0 0 10px;
+}
+
+#bubbleOverlay.surfaced .overlay-panel {
+  animation: surfaceIn 0.9s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@keyframes surfaceIn {
+  from { opacity: 0; transform: translateY(30px) scale(0.97); }
+  to { opacity: 1; transform: none; }
+}
+
+@media (max-width: 520px) {
+  .surface-btn { font-size: 0.76rem; }
+  .scene-poster { border-radius: 20px; }
+  .poster-text { left: 14px; right: 14px; bottom: 12px; }
+}
+
+.bubble-scene-card {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: 16px;
+  overflow: hidden;
+  margin: 0 0 16px;
+  border: 1px solid rgba(244, 239, 230, 0.1);
+  background: linear-gradient(160deg, var(--s1, #1a2a24), var(--s2, #0b0e14));
+}
+
+.bubble-scene-img {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center 45%;
+  background-repeat: no-repeat;
+}
+
+.bubble-scene-shade {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top, rgba(4, 6, 10, 0.86), rgba(4, 6, 10, 0.06) 62%, rgba(4, 6, 10, 0.18));
+}
+
+.bubble-scene-caption {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 10px;
+  z-index: 2;
+}
+
+.bubble-scene-caption span {
+  display: block;
+  color: var(--faint);
+  font-size: 0.64rem;
+  letter-spacing: 0.18em;
+  margin-bottom: 3px;
+}
+
+.bubble-scene-caption p {
+  margin: 0;
+  color: var(--text);
+  font-family: var(--serif);
+  font-size: 0.82rem;
+  line-height: 1.5;
+  text-shadow: 0 1px 10px rgba(0, 0, 0, 0.6);
+}
+
+/* 回顾/设置：背景保留照片，但压暗，保证日历可读 */
+body.review-mode .scene-host {
+  filter: brightness(0.58) saturate(0.9);
+}
+
+body.review-mode .scene-scrim {
+  background:
+    radial-gradient(ellipse at 50% 42%, transparent 0%, rgba(4, 6, 10, 0.18) 48%, rgba(4, 6, 10, 0.5) 100%),
+    linear-gradient(to bottom, rgba(4, 6, 10, 0.22), transparent 26%, rgba(4, 6, 10, 0.42) 100%);
+}
+
+.day-cell,
+.year-month-card {
+  background: rgba(10, 14, 22, 0.56);
+}
+
+.day-cell.is-empty { opacity: 0.6; }
+.day-cell:not(.is-empty) .day-num { color: var(--text); }

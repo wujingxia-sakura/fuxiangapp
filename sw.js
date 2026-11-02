@@ -1,7 +1,7 @@
 /* 浮想 · Service Worker
  * 静态壳缓存 + 场景图片按需缓存；没有第三方请求。
  */
-const CACHE = 'fuxiang-v12';
+const CACHE = 'fuxiang-v21';
 const IMAGE_CACHE = 'fuxiang-images-v1';
 const ASSETS = [
   './',

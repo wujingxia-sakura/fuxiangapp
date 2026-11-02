@@ -1,4 +1,4 @@
-﻿/* 浮想 · 应用
+/* 浮想 · 应用
  * 本地优先：数据存在浏览器 localStorage 里。
  * 没有后端、没有账号、没有第三方请求。
  */
@@ -138,7 +138,7 @@
 
   function summaryLine(keys) {
     const top = topFamilies(keys).slice(0, 4);
-    if (!top.length) return '还没有天气记录。';
+    if (!top.length) return '还没有心情天气记录。';
     return top.map(function (pair) {
       const fam = DATA.familyMap[pair[0]];
       return (fam ? fam.name : pair[0]) + ' ' + pair[1] + ' 天';
@@ -164,6 +164,9 @@
       const parsed = JSON.parse(raw);
       if (!parsed || parsed.version !== 1 || !parsed.days || !Array.isArray(parsed.bubbles)) return defaultState();
       if (!parsed.settings) parsed.settings = { reducedMotion: false };
+      parsed.bubbles.forEach(function (b) {
+        if (!Array.isArray(b.comments)) b.comments = [];
+      });
       return parsed;
     } catch (e) {
       return defaultState();
@@ -187,6 +190,7 @@
   let pickerTab = 'weather';
   let pickerFamily = 'clear';
   let pickerGroup = '全部';
+  let pickerTarget = null;
   let deferredPrompt = null;
   let lastDeleted = null;
   let openDayKey = null;
@@ -487,8 +491,7 @@
     const seg = currentSegment(day);
     if (seg) {
       mainScene.set(seg.scene);
-      const s = DATA.sceneMap[seg.scene];
-      $('#sceneCaption').textContent = s ? s.line : '';
+      renderPoster(seg.scene);
     }
 
     renderChips(day);
@@ -496,14 +499,33 @@
     renderTimeline(day);
   }
 
+  function renderPoster(sceneName) {
+    const s = DATA.sceneMap[sceneName] || DATA.scenes[0];
+    const poster = $('#scenePoster');
+    const img = $('#posterImage');
+    if (!poster || !img) return;
+    poster.style.setProperty('--s1', s.palette[0]);
+    poster.style.setProperty('--s2', s.palette[1]);
+    poster.style.setProperty('--accent', s.accent);
+    img.style.backgroundImage = s.image ? 'url("' + s.image + '")' : 'none';
+    if (poster.dataset.scene !== s.name) {
+      poster.dataset.scene = s.name;
+      img.classList.remove('poster-in');
+      void img.offsetWidth;
+      img.classList.add('poster-in');
+    }
+    $('#posterSceneName').textContent = s.name;
+    $('#sceneCaption').textContent = s.line;
+  }
+
   function renderChips(day) {
     const seg = currentSegment(day);
     if (!seg) return;
     const w = DATA.weatherMap[seg.weather] || DATA.weathers[0];
     const s = DATA.sceneMap[seg.scene] || DATA.scenes[0];
-    $('#weatherChip').innerHTML = '<span class="dot" style="--c:' + w.color + '"></span>' + escapeHtml(w.name);
-    $('#weatherChip').title = '切换天气';
-    $('#sceneChip').innerHTML = '<span class="dot" style="--c:' + s.accent + '"></span>' + escapeHtml(s.name);
+    $('#weatherChip').innerHTML = '<span class="dot" style="--c:' + w.color + '"></span>心情 · ' + escapeHtml(w.name);
+    $('#weatherChip').title = '切换心情天气（不是真实天气）';
+    $('#sceneChip').innerHTML = '<span class="dot" style="--c:' + s.accent + '"></span>场景 · ' + escapeHtml(s.name);
     $('#sceneChip').title = s.line;
   }
 
@@ -538,6 +560,7 @@
     const tags = (Array.isArray(b.tags) ? b.tags : []).map(function (t) {
       return '<span class="tag">#' + escapeHtml(t) + '</span>';
     }).join(' ');
+    const commentCount = (b.comments || []).length;
     return '<article class="bubble" data-bubble="' + escapeAttr(b.id) + '" tabindex="0" role="button" aria-label="打开泡泡">' +
       '<div class="bubble-text">' + escapeHtml(b.text || '') + '</div>' +
       '<div class="bubble-foot">' +
@@ -548,6 +571,7 @@
       '<span>·</span>' +
       '<span>' + timeLabel(b.createdAt) + '</span>' +
       (tags ? '<span>·</span>' + tags : '') +
+      (commentCount ? '<span>·</span><span>' + commentCount + ' 条留言</span>' : '') +
       '</div>' +
       '</article>';
   }
@@ -556,7 +580,7 @@
     const timeline = $('#todayTimeline');
     const segs = day.segments || [];
     if (!segs.length) {
-      timeline.innerHTML = '<div class="empty"><strong>今天还没有泡泡</strong>写一句，落进这场天气里。</div>';
+      timeline.innerHTML = '<div class="empty"><strong>今天还没有泡泡</strong>写一句，落进今天的心情里。</div>';
       return;
     }
     const totalBubbles = state.bubbles.filter(function (b) { return b.dateKey === day.date; }).length;
@@ -568,7 +592,7 @@
       html += '<section class="segment" data-seg="' + escapeAttr(seg.id) + '">' +
         '<div class="segment-head">' +
         '<span class="segment-time">' + timeLabel(seg.start) + '</span>' +
-        '<span class="segment-weather"><i class="weather-dot" style="--c:' + weatherColor(seg.weather) + '"></i>' + escapeHtml(seg.weather) + '</span>' +
+        '<span class="segment-weather" title="心情天气"><i class="weather-dot" style="--c:' + weatherColor(seg.weather) + '"></i>' + escapeHtml(seg.weather) + '</span>' +
         '<span class="segment-scene">' + escapeHtml(seg.scene) + '</span>' +
         '<span class="segment-line"></span>' +
         '</div>';
@@ -578,7 +602,7 @@
       html += '</section>';
     });
     if (!totalBubbles) {
-      html += '<div class="empty"><strong>今天还没有泡泡</strong>写一句，落进这场天气里。</div>';
+      html += '<div class="empty"><strong>今天还没有泡泡</strong>写一句，落进今天的心情里。</div>';
     }
     timeline.innerHTML = html;
   }
@@ -606,7 +630,8 @@
       segmentId: seg.id,
       weather: seg.weather,
       scene: seg.scene,
-      tags: extractTags(text)
+      tags: extractTags(text),
+      comments: []
     };
     state.bubbles.push(bubble);
     saveState();
@@ -634,14 +659,18 @@
 
   // ---------- 选择器 ----------
 
-  function openPicker(tab) {
+  function openPicker(tab, target) {
     pickerTab = tab || 'weather';
+    pickerTarget = target || null;
     const day = ensureTodaySegment();
     const seg = currentSegment(day);
-    if (seg) {
-      const w = DATA.weatherMap[seg.weather];
-      if (w) pickerFamily = w.family;
+    let current = null;
+    if (pickerTarget && pickerTarget.bubbleId) {
+      current = state.bubbles.find(function (b) { return b.id === pickerTarget.bubbleId; });
     }
+    const weatherName = current ? current.weather : (seg ? seg.weather : null);
+    const w = DATA.weatherMap[weatherName];
+    if (w) pickerFamily = w.family;
     $('#pickerOverlay').classList.remove('hidden');
     syncScrollLock();
     renderPicker();
@@ -649,6 +678,7 @@
 
   function closePicker() {
     $('#pickerOverlay').classList.add('hidden');
+    pickerTarget = null;
     syncScrollLock();
   }
 
@@ -658,8 +688,14 @@
     const body = $('#pickerBody');
     if (pickerTab === 'weather') {
       const day = ensureTodaySegment();
-      const seg = currentSegment(day);
-      const currentWeather = seg ? seg.weather : null;
+      let currentWeather = null;
+      if (pickerTarget && pickerTarget.bubbleId) {
+        const b = state.bubbles.find(function (x) { return x.id === pickerTarget.bubbleId; });
+        currentWeather = b ? b.weather : null;
+      } else {
+        const seg = currentSegment(day);
+        currentWeather = seg ? seg.weather : null;
+      }
       const family = DATA.familyMap[pickerFamily] || DATA.families[0];
       const variants = DATA.weathers.filter(function (w) { return w.family === family.id; });
 
@@ -671,13 +707,20 @@
         '<div class="variant-grid">' + variants.map(function (w) {
           return '<button class="variant-btn' + (w.name === currentWeather ? ' active' : '') + '" data-weather="' + escapeAttr(w.name) + '" style="--c:' + w.color + '">' + w.name + '</button>';
         }).join('') + '</div>' +
-        '<p class="hint">' + escapeHtml(family.name) + ' · ' + variants.length + ' 种。选一个，天就变了。</p>';
+        '<p class="hint">' + escapeHtml(family.name) + ' · ' + variants.length + ' 种。' +
+        (pickerTarget ? '只改这颗泡泡的心情。' : '不是真实天气，是你此刻的心情。') + '</p>';
       return;
     }
 
     const day = ensureTodaySegment();
-    const seg = currentSegment(day);
-    const currentScene = seg ? seg.scene : null;
+    let currentScene = null;
+    if (pickerTarget && pickerTarget.bubbleId) {
+      const b = state.bubbles.find(function (x) { return x.id === pickerTarget.bubbleId; });
+      currentScene = b ? b.scene : null;
+    } else {
+      const seg = currentSegment(day);
+      currentScene = seg ? seg.scene : null;
+    }
     const scenes = pickerGroup === '全部' ? DATA.scenes : DATA.scenes.filter(function (s) { return s.group === pickerGroup; });
     body.innerHTML =
       '<div class="scene-group-row">' + DATA.groups.map(function (g) {
@@ -688,15 +731,38 @@
           '<span class="scene-name">' + escapeHtml(s.name) + '</span>' +
           '<span class="scene-line">' + escapeHtml(s.line) + '</span>' +
           '</button>';
-      }).join('') + '</div>';
+      }).join('') + '</div>' +
+      '<p class="hint">' + (pickerTarget ? '只改这颗泡泡的场景。' : '场景是照片，心情是天气；可以搭，也可以不搭。') + '</p>';
   }
 
   function chooseWeather(name) {
+    if (pickerTarget && pickerTarget.bubbleId) {
+      const b = state.bubbles.find(function (x) { return x.id === pickerTarget.bubbleId; });
+      if (b) {
+        b.weather = name;
+        saveState();
+        updateBubbleContext(b);
+        refreshAll();
+      }
+      closePicker();
+      return;
+    }
     updateSegment({ weather: name });
     closePicker();
   }
 
   function chooseScene(name) {
+    if (pickerTarget && pickerTarget.bubbleId) {
+      const b = state.bubbles.find(function (x) { return x.id === pickerTarget.bubbleId; });
+      if (b) {
+        b.scene = name;
+        saveState();
+        updateBubbleContext(b);
+        refreshAll();
+      }
+      closePicker();
+      return;
+    }
     updateSegment({ scene: name });
     closePicker();
   }
@@ -708,6 +774,8 @@
     $('#viewToday').classList.toggle('hidden', name !== 'today');
     $('#viewReview').classList.toggle('hidden', name !== 'review');
     $('#viewSettings').classList.toggle('hidden', name !== 'settings');
+    document.body.classList.toggle('has-poster', name === 'today');
+    document.body.classList.toggle('review-mode', name !== 'today');
 
     let hash = '#/';
     if (name === 'review') hash = reviewMode === 'year' ? '#/review/year' : '#/review';
@@ -820,7 +888,7 @@
     const wheel = '<div class="year-wheel" style="background-image: conic-gradient(' + stops.join(',') + ')">' +
       '<div class="year-wheel-hole">' +
       '<span class="year-wheel-year">' + y + '</span>' +
-      '<span class="year-wheel-sub">' + (topName ? topName + '最多' : '还没有天气') + '</span>' +
+      '<span class="year-wheel-sub">' + (topName ? topName + '最多' : '还没有心情') + '</span>' +
       '</div></div>';
 
     let months = '';
@@ -884,7 +952,7 @@
     daySceneView.set(scene.name, true);
 
     $('#dayTitle').textContent = formatDateShort(key);
-    $('#daySub').textContent = (dom ? weatherTrail(day) : '没有天气记录') + (segs.length ? ' · ' + segs.length + ' 段' : '');
+    $('#daySub').textContent = '心情天气：' + (dom ? weatherTrail(day) : '没有记录') + (segs.length ? ' · ' + segs.length + ' 段' : '');
     $('#daySceneLine').textContent = scene.line || '';
 
     const epigraph = '<div class="epigraph-wrap">' +
@@ -894,7 +962,7 @@
 
     let body = epigraph;
     if (!segs.length) {
-      body += '<div class="empty"><strong>这一天没有天气</strong>也许那天，你只是路过。</div>';
+      body += '<div class="empty"><strong>这一天没有留下心情</strong>也许那天，你只是路过。</div>';
     } else {
       body += '<div class="day-ribbon">' + segs.map(function (s) {
         return '<span class="day-seg" style="--c:' + weatherColor(s.weather) + '" title="' + escapeAttr(timeLabel(s.start) + ' · ' + s.weather + ' · ' + s.scene) + '"></span>';
@@ -907,7 +975,7 @@
         body += '<section class="segment">' +
           '<div class="segment-head">' +
           '<span class="segment-time">' + timeLabel(seg.start) + '</span>' +
-          '<span class="segment-weather"><i class="weather-dot" style="--c:' + weatherColor(seg.weather) + '"></i>' + escapeHtml(seg.weather) + '</span>' +
+          '<span class="segment-weather" title="心情天气"><i class="weather-dot" style="--c:' + weatherColor(seg.weather) + '"></i>' + escapeHtml(seg.weather) + '</span>' +
           '<span class="segment-scene">' + escapeHtml(seg.scene) + '</span>' +
           '<span class="segment-line"></span>' +
           '</div>' +
@@ -916,7 +984,7 @@
       });
 
       if (!state.bubbles.some(function (b) { return b.dateKey === key; })) {
-        body += '<div class="empty"><strong>这一天没有泡泡</strong>只有天气，也算来过。</div>';
+        body += '<div class="empty"><strong>这一天没有泡泡</strong>只有心情，也算来过。</div>';
       }
     }
 
@@ -933,13 +1001,66 @@
 
   // ---------- 泡泡详情 ----------
 
+  function setBubbleScene(b) {
+    const s = DATA.sceneMap[b.scene] || DATA.scenes[0];
+    const el = $('#bubbleScene');
+    if (!el) return;
+    el.style.background = 'linear-gradient(160deg, ' + s.palette[0] + ', ' + s.palette[1] + ')';
+    el.style.backgroundImage = 'none';
+    const token = (el._token || 0) + 1;
+    el._token = token;
+    if (s.image) {
+      const img = new Image();
+      img.onload = function () {
+        if (el._token === token) el.style.backgroundImage = 'url("' + s.image + '")';
+      };
+      img.src = s.image;
+    }
+  }
+
+  function bubbleSceneCard(b) {
+    const s = DATA.sceneMap[b.scene] || DATA.scenes[0];
+    return '<div class="bubble-scene-card" style="--s1:' + s.palette[0] + ';--s2:' + s.palette[1] + '">' +
+      (s.image ? '<div class="bubble-scene-img" style="background-image:url(\'' + s.image + '\')"></div>' : '') +
+      '<div class="bubble-scene-shade"></div>' +
+      '<div class="bubble-scene-caption"><span>' + escapeHtml(s.name) + '</span><p>' + escapeHtml(s.line) + '</p></div>' +
+      '</div>';
+  }
+
+  function updateBubbleContext(b) {
+    const w = DATA.weatherMap[b.weather] || { name: b.weather || '' };
+    const s = DATA.sceneMap[b.scene] || { name: b.scene || '' };
+    $('#bubbleMeta').textContent = b.dateKey + ' ' + timeLabel(b.createdAt) + ' · 心情 · ' + w.name;
+    setBubbleScene(b);
+    const wBtn = document.querySelector('[data-edit-context="weather"]');
+    const sBtn = document.querySelector('[data-edit-context="scene"]');
+    if (wBtn) wBtn.textContent = '心情 · ' + w.name;
+    if (sBtn) sBtn.textContent = '场景 · ' + s.name;
+  }
+
+  function commentsHtml(b) {
+    const comments = Array.isArray(b.comments) ? b.comments : [];
+    const list = comments.length ? comments.map(function (c) {
+      return '<div class="comment-item">' +
+        '<p class="comment-text">' + escapeHtml(c.text) + '</p>' +
+        '<span class="comment-time">' + timeLabel(c.createdAt) + '</span>' +
+        '<button class="comment-del" data-act="comment-delete" data-comment-id="' + escapeAttr(c.id) + '" aria-label="删除留言">×</button>' +
+        '</div>';
+    }).join('') : '<p class="comments-empty">还没有留言。写一句，给以后的自己。</p>';
+    return '<div class="bubble-comments">' +
+      '<div class="comments-title">给自己的留言</div>' +
+      '<div class="comments-list">' + list + '</div>' +
+      '<div class="comment-form">' +
+      '<input id="commentInput" class="comment-input" type="text" maxlength="160" placeholder="写一句给自己的话…" aria-label="给自己的留言">' +
+      '<button class="comment-send" data-act="comment-add">留下</button>' +
+      '</div></div>';
+  }
+
   function openBubble(id) {
     const b = state.bubbles.find(function (x) { return x.id === id; });
     if (!b) return;
     currentBubbleId = id;
-    const w = DATA.weatherMap[b.weather] || { name: b.weather || '' };
-    const s = DATA.sceneMap[b.scene] || { name: b.scene || '' };
-    $('#bubbleMeta').textContent = b.dateKey + ' ' + timeLabel(b.createdAt) + ' · ' + w.name + ' · ' + s.name;
+    updateBubbleContext(b);
     renderBubbleBody(b);
     $('#bubbleOverlay').classList.remove('hidden');
     syncScrollLock();
@@ -948,8 +1069,10 @@
   function renderBubbleBody(b) {
     const tags = (Array.isArray(b.tags) ? b.tags : []).map(function (t) { return '<span class="tag">#' + escapeHtml(t) + '</span>'; }).join(' ');
     $('#bubbleBody').innerHTML =
+      bubbleSceneCard(b) +
       '<div class="bubble-text">' + escapeHtml(b.text || '') + '</div>' +
       (tags ? '<div class="bubble-foot">' + tags + '</div>' : '') +
+      commentsHtml(b) +
       '<div class="bubble-actions">' +
       '<button class="btn" data-act="edit">编辑</button>' +
       '<button class="btn" data-act="copy">复制</button>' +
@@ -960,14 +1083,45 @@
   function editBubble(id) {
     const b = state.bubbles.find(function (x) { return x.id === id; });
     if (!b) return;
+    const w = DATA.weatherMap[b.weather] || { name: b.weather || '' };
+    const s = DATA.sceneMap[b.scene] || { name: b.scene || '' };
     $('#bubbleBody').innerHTML =
-      '<textarea id="editBubbleText" class="edit-bubble-text" rows="6">' + escapeHtml(b.text) + '</textarea>' +
+      '<div class="edit-context">' +
+      '<button class="context-chip" data-edit-context="weather">心情 · ' + escapeHtml(w.name) + '</button>' +
+      '<button class="context-chip" data-edit-context="scene">场景 · ' + escapeHtml(s.name) + '</button>' +
+      '</div>' +
+      '<p class="edit-hint">心情和场景改完即保存；文字要点“保存”。</p>' +
+      '<textarea id="editBubbleText" class="edit-bubble-text" rows="6">' + escapeHtml(b.text || '') + '</textarea>' +
       '<div class="bubble-actions">' +
       '<button class="btn" data-act="save" data-id="' + escapeAttr(b.id) + '">保存</button>' +
       '<button class="btn" data-act="cancel">取消</button>' +
       '</div>';
     const ta = $('#editBubbleText');
     if (ta) { ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }
+  }
+
+  function addComment(id) {
+    const b = state.bubbles.find(function (x) { return x.id === id; });
+    const input = $('#commentInput');
+    if (!b || !input) return;
+    const text = input.value.trim();
+    if (!text) return;
+    b.comments = Array.isArray(b.comments) ? b.comments : [];
+    b.comments.push({ id: uid(), text: text, createdAt: Date.now() });
+    saveState();
+    renderBubbleBody(b);
+    const next = $('#commentInput');
+    if (next) next.focus();
+    refreshAll();
+  }
+
+  function deleteComment(id, commentId) {
+    const b = state.bubbles.find(function (x) { return x.id === id; });
+    if (!b) return;
+    b.comments = (Array.isArray(b.comments) ? b.comments : []).filter(function (c) { return c.id !== commentId; });
+    saveState();
+    renderBubbleBody(b);
+    refreshAll();
   }
 
   function saveBubbleEdit(id) {
@@ -1011,6 +1165,42 @@
     if (currentView === 'today') renderToday();
     if (currentView === 'review') renderReview();
     if (openDayKey) openDay(openDayKey);
+  }
+
+  function surfaceOldBubble() {
+    const today = todayKey();
+    const old = state.bubbles.filter(function (b) { return b.dateKey < today; });
+    if (!old.length) {
+      toast('还没有旧泡泡，明天再来看看');
+      return;
+    }
+    const now = new Date();
+    const recentTags = new Set();
+    state.bubbles.forEach(function (b) {
+      const d = parseDateKey(b.dateKey);
+      if ((now - d) < 7 * 86400000) {
+        (b.tags || []).forEach(function (t) { recentTags.add(t); });
+      }
+    });
+    const weighted = old.map(function (b) {
+      let w = 1;
+      const d = parseDateKey(b.dateKey);
+      if (d.getMonth() === now.getMonth() && d.getDate() === now.getDate()) w += 5;
+      if ((b.tags || []).some(function (t) { return recentTags.has(t); })) w += 2;
+      if (b.weight === 'heavy') w += 1.5;
+      return { b: b, w: w };
+    });
+    const total = weighted.reduce(function (sum, item) { return sum + item.w; }, 0);
+    let r = Math.random() * total;
+    let pick = weighted[0].b;
+    for (let i = 0; i < weighted.length; i++) {
+      r -= weighted[i].w;
+      if (r <= 0) { pick = weighted[i].b; break; }
+    }
+    openBubble(pick.id);
+    const overlay = $('#bubbleOverlay');
+    overlay.classList.add('surfaced');
+    setTimeout(function () { overlay.classList.remove('surfaced'); }, 1200);
   }
 
   // ---------- 搜索 ----------
@@ -1113,7 +1303,7 @@
       lines.push('## ' + key + ' · ' + formatDateShort(key).split(' · ')[1]);
       if (day.epigraph) lines.push('', '> ' + day.epigraph);
       if (!segs.length) {
-        lines.push('', '（这一天没有天气记录）');
+        lines.push('', '（这一天没有心情天气记录）');
       }
       segs.forEach(function (seg) {
         lines.push('', '### ' + timeLabel(seg.start) + ' · ' + seg.weather + ' · ' + seg.scene);
@@ -1123,6 +1313,12 @@
         bubbles.forEach(function (b) {
           lines.push('', b.text);
           if (b.tags && b.tags.length) lines.push('', b.tags.map(function (t) { return '#' + t; }).join(' '));
+          if (b.comments && b.comments.length) {
+            lines.push('', '> 给自己的留言：');
+            b.comments.forEach(function (c) {
+              lines.push('> - ' + c.text + '（' + timeLabel(c.createdAt) + '）');
+            });
+          }
         });
       });
       lines.push('', '---');
@@ -1149,7 +1345,10 @@
         if (!confirm('导入会覆盖当前数据，继续？')) return;
         state = data;
         if (!state.settings) state.settings = { reducedMotion: false };
-        state.bubbles.forEach(function (b) { if (!Array.isArray(b.tags)) b.tags = extractTags(b.text || ''); });
+        state.bubbles.forEach(function (b) {
+          if (!Array.isArray(b.tags)) b.tags = extractTags(b.text || '');
+          if (!Array.isArray(b.comments)) b.comments = [];
+        });
         activeSegmentId = null;
         lastDateKey = todayKey();
         saveState();
@@ -1217,7 +1416,8 @@
           segmentId: seg.id,
           weather: seg.weather,
           scene: seg.scene,
-          tags: extractTags(b.text)
+          tags: extractTags(b.text),
+          comments: (offset === 0 && i === 0) ? [{ id: uid(), text: '第二版：给过去的自己留一句话。', createdAt: Date.now() }] : []
         });
       });
     }
@@ -1294,6 +1494,7 @@
 
     $('#weatherChip').addEventListener('click', function () { openPicker('weather'); });
     $('#sceneChip').addEventListener('click', function () { openPicker('scene'); });
+    $('#surfaceBtn').addEventListener('click', surfaceOldBubble);
 
     $('#reviewBtn').addEventListener('click', function () { showView('review'); });
     $('#settingsBtn').addEventListener('click', function () { showView('settings'); });
@@ -1349,6 +1550,7 @@
       const target = day.segments.find(function (s) { return s.id === seg.dataset.seg; });
       if (!target) return;
       mainScene.set(target.scene);
+      renderPoster(target.scene);
       const el = document.querySelector('.segment[data-seg="' + target.id + '"]');
       if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
     });
@@ -1395,10 +1597,17 @@
       if (e.target.id === 'bubbleOverlay') closeBubble();
     });
     $('#bubbleBody').addEventListener('click', function (e) {
+      const ctx = e.target.closest('[data-edit-context]');
+      if (ctx) {
+        if (currentBubbleId) openPicker(ctx.dataset.editContext, { bubbleId: currentBubbleId });
+        return;
+      }
       const act = e.target.closest('[data-act]');
       if (!act) return;
       const meta = $('#bubbleMeta').textContent;
       const idFromSave = act.dataset.id;
+      if (act.dataset.act === 'comment-add') { addComment(currentBubbleId); return; }
+      if (act.dataset.act === 'comment-delete') { deleteComment(currentBubbleId, act.dataset.commentId); return; }
       if (act.dataset.act === 'edit') {
         // 从 meta 里找回 id 不可靠；用当前打开的泡泡 id
         const id = currentBubbleId;
@@ -1426,6 +1635,13 @@
       if (act.dataset.act === 'delete') {
         const id = currentBubbleId;
         if (id) deleteBubble(id);
+      }
+    });
+    $('#bubbleBody').addEventListener('keydown', function (e) {
+      if (e.target.id !== 'commentInput') return;
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        addComment(currentBubbleId);
       }
     });
 

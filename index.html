@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#0b0e14">
   <meta name="color-scheme" content="dark">
-  <title>浮想 · 内心天气</title>
-  <meta name="description" content="浮想：一个默认私密的内心天气记录。打开就写，写完落进那天的天气里。">
+  <title>浮想 · 心情天气</title>
+  <meta name="description" content="浮想：一个默认私密的心情天气记录。打开就写，写完落进那天的心里。">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
@@ -37,26 +37,41 @@
         </div>
       </header>
 
-      <div class="date-line">
-        <div class="date-kicker"><span id="yearText"></span><span class="kicker-dot">·</span><span id="weekText"></span></div>
-        <div class="date-main" id="dateMain"></div>
-        <div class="greeting" id="greeting"></div>
-      </div>
-      <p class="scene-caption" id="sceneCaption"></p>
+      <div class="today-layout">
+        <div class="today-left">
+          <div class="date-line">
+            <div class="date-kicker"><span id="yearText"></span><span class="kicker-dot">·</span><span id="weekText"></span></div>
+            <div class="date-main" id="dateMain"></div>
+            <div class="greeting" id="greeting"></div>
+          </div>
 
-      <div id="weatherRibbon" class="weather-ribbon" aria-label="今天的天气带"></div>
-      <main id="todayTimeline" class="timeline"></main>
+          <div class="scene-poster" id="scenePoster">
+            <div class="poster-image" id="posterImage"></div>
+            <div class="poster-shade"></div>
+            <div class="poster-text">
+              <span class="poster-scene" id="posterSceneName"></span>
+              <p class="scene-caption" id="sceneCaption"></p>
+            </div>
+          </div>
+        </div>
 
-      <div class="composer">
-        <div class="composer-meta">
-          <button id="weatherChip" class="meta-chip" aria-label="切换天气"></button>
-          <button id="sceneChip" class="meta-chip" aria-label="切换场景"></button>
+        <div class="today-right">
+          <div class="composer">
+            <div class="composer-meta">
+              <button id="weatherChip" class="meta-chip" aria-label="切换心情天气"></button>
+              <button id="sceneChip" class="meta-chip" aria-label="切换场景"></button>
+            </div>
+            <div class="composer-row">
+              <textarea id="bubbleInput" rows="1" placeholder="现在在想什么？" enterkeyhint="send" aria-label="写一颗泡泡"></textarea>
+              <button id="sendBtn" class="send-btn" aria-label="发送"><svg class="icon send-icon"><use href="#i-send"></use></svg></button>
+            </div>
+            <div class="composer-hint">Enter 发送 · Shift + Enter 换行</div>
+          </div>
+
+          <button id="surfaceBtn" class="surface-btn" type="button" aria-label="随机浮上来一个过去的泡泡"><span>✦</span>浮上来一个旧泡泡</button>
+          <div id="weatherRibbon" class="weather-ribbon" aria-label="今天的心情天气"></div>
+          <main id="todayTimeline" class="timeline"></main>
         </div>
-        <div class="composer-row">
-          <textarea id="bubbleInput" rows="1" placeholder="现在在想什么？" enterkeyhint="send" aria-label="写一颗泡泡"></textarea>
-          <button id="sendBtn" class="send-btn" aria-label="发送"><svg class="icon send-icon"><use href="#i-send"></use></svg></button>
-        </div>
-        <div class="composer-hint">Enter 发送 · Shift + Enter 换行</div>
       </div>
     </section>
 
@@ -116,13 +131,13 @@
 
         <section class="settings-card">
           <h2>关于</h2>
-          <p class="muted">浮想 v0.1 · 一个默认私密的内心天气记录。</p>
-          <p class="muted">泡泡会淡，天气会变，写下的东西会留下来。</p>
+          <p class="muted">浮想 v0.2 · 一个默认私密的心情天气记录。</p>
+          <p class="muted">泡泡会淡，心情会变，写下的东西会留下来。</p>
         </section>
 
         <section class="settings-card danger">
           <h2>清空</h2>
-          <p class="muted">删除这台设备上的全部泡泡和天气。建议先导出。</p>
+          <p class="muted">删除这台设备上的全部泡泡和心情。建议先导出。</p>
           <div class="button-row">
             <button id="clearData" class="btn danger-btn">清空全部数据</button>
           </div>
@@ -146,12 +161,12 @@
     </div>
   </div>
 
-  <div id="pickerOverlay" class="sheet hidden" role="dialog" aria-modal="true" aria-label="选择天气或场景">
+  <div id="pickerOverlay" class="sheet hidden" role="dialog" aria-modal="true" aria-label="选择心情天气或场景">
     <div id="pickerBackdrop" class="sheet-backdrop"></div>
     <div class="sheet-panel">
       <header class="sheet-head">
         <div class="segmented small" id="pickerTabs">
-          <button data-tab="weather" class="active">天气</button>
+          <button data-tab="weather" class="active">心情</button>
           <button data-tab="scene">场景</button>
         </div>
         <button id="pickerClose" class="icon-btn" aria-label="关闭"><svg class="icon"><use href="#i-close"></use></svg></button>
@@ -161,9 +176,12 @@
   </div>
 
   <div id="bubbleOverlay" class="overlay hidden" role="dialog" aria-modal="true" aria-label="泡泡详情">
+    <div id="bubbleScene" class="overlay-scene bubble-scene" aria-hidden="true"></div>
     <div class="overlay-panel narrow">
       <header class="overlay-head">
-        <div id="bubbleMeta" class="overlay-sub"></div>
+        <div>
+          <div id="bubbleMeta" class="overlay-sub"></div>
+        </div>
         <button id="bubbleClose" class="icon-btn" aria-label="关闭"><svg class="icon"><use href="#i-close"></use></svg></button>
       </header>
       <div id="bubbleBody" class="overlay-body"></div>

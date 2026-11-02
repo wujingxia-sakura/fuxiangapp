@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0b0e14">
+  <meta name="color-scheme" content="dark">
+  <title>浮想 · 内心天气</title>
+  <meta name="description" content="浮想：一个默认私密的内心天气记录。打开就写，写完落进那天的天气里。">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <svg class="svg-sprite" aria-hidden="true">
+    <defs>
+      <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m16.5 16.5 4 4"/></symbol>
+      <symbol id="i-more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.4" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1.4" fill="currentColor" stroke="none"/></symbol>
+      <symbol id="i-back" viewBox="0 0 24 24"><path d="M15 5 8 12l7 7"/></symbol>
+      <symbol id="i-close" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></symbol>
+      <symbol id="i-send" viewBox="0 0 24 24"><path d="M12 19V5M6 11l6-6 6 6"/></symbol>
+    </defs>
+  </svg>
+
+  <div id="sceneHost" class="scene-host" aria-hidden="true"></div>
+  <div class="scene-scrim" aria-hidden="true"></div>
+
+  <div class="app">
+    <section id="viewToday" class="view">
+      <header class="topbar">
+        <div class="brand">浮想</div>
+        <div class="topbar-actions">
+          <button id="searchBtn" class="icon-btn" aria-label="搜索"><svg class="icon"><use href="#i-search"></use></svg></button>
+          <button id="reviewBtn" class="text-btn">回顾</button>
+          <button id="settingsBtn" class="icon-btn" aria-label="设置"><svg class="icon"><use href="#i-more"></use></svg></button>
+        </div>
+      </header>
+
+      <div class="date-line">
+        <div class="date-kicker"><span id="yearText"></span><span class="kicker-dot">·</span><span id="weekText"></span></div>
+        <div class="date-main" id="dateMain"></div>
+        <div class="greeting" id="greeting"></div>
+      </div>
+      <p class="scene-caption" id="sceneCaption"></p>
+
+      <div id="weatherRibbon" class="weather-ribbon" aria-label="今天的天气带"></div>
+      <main id="todayTimeline" class="timeline"></main>
+
+      <div class="composer">
+        <div class="composer-meta">
+          <button id="weatherChip" class="meta-chip" aria-label="切换天气"></button>
+          <button id="sceneChip" class="meta-chip" aria-label="切换场景"></button>
+        </div>
+        <div class="composer-row">
+          <textarea id="bubbleInput" rows="1" placeholder="现在在想什么？" enterkeyhint="send" aria-label="写一颗泡泡"></textarea>
+          <button id="sendBtn" class="send-btn" aria-label="发送"><svg class="icon send-icon"><use href="#i-send"></use></svg></button>
+        </div>
+        <div class="composer-hint">Enter 发送 · Shift + Enter 换行</div>
+      </div>
+    </section>
+
+    <section id="viewReview" class="view hidden">
+      <header class="topbar">
+        <button id="reviewBack" class="icon-btn" aria-label="回到今天"><svg class="icon"><use href="#i-back"></use></svg></button>
+        <div class="brand small">回顾</div>
+        <div class="topbar-actions">
+          <button id="reviewToday" class="text-btn">今天</button>
+          <button id="settingsBtn2" class="icon-btn" aria-label="设置"><svg class="icon"><use href="#i-more"></use></svg></button>
+        </div>
+      </header>
+
+      <div class="segmented" id="reviewTabs">
+        <button data-review="month" class="active">月</button>
+        <button data-review="year">年</button>
+      </div>
+
+      <div id="reviewContent" class="review-content"></div>
+    </section>
+
+    <section id="viewSettings" class="view hidden">
+      <header class="topbar">
+        <button id="settingsBack" class="icon-btn" aria-label="回到今天"><svg class="icon"><use href="#i-back"></use></svg></button>
+        <div class="brand small">设置</div>
+        <div></div>
+      </header>
+
+      <div class="settings-content">
+        <section class="settings-card">
+          <h2>数据</h2>
+          <p class="muted">当前是本地版：数据只存在这台设备。定期导出 JSON 备份。</p>
+          <div class="button-row">
+            <button id="exportMd" class="btn">导出 Markdown</button>
+            <button id="exportJson" class="btn">导出 JSON</button>
+            <button id="importBtn" class="btn">导入 JSON</button>
+            <input id="importFile" type="file" accept="application/json,.json" hidden>
+          </div>
+        </section>
+
+        <section class="settings-card">
+          <h2>体验</h2>
+          <label class="switch-row">
+            <span>减少动效</span>
+            <input id="reduceMotion" type="checkbox">
+          </label>
+        </section>
+
+        <section class="settings-card">
+          <h2>安装</h2>
+          <p class="muted">装到桌面后，打开更像一个 App。</p>
+          <div class="button-row">
+            <button id="installBtn" class="btn">安装到桌面</button>
+          </div>
+          <p id="installHint" class="hint"></p>
+        </section>
+
+        <section class="settings-card">
+          <h2>关于</h2>
+          <p class="muted">浮想 v0.1 · 一个默认私密的内心天气记录。</p>
+          <p class="muted">泡泡会淡，天气会变，写下的东西会留下来。</p>
+        </section>
+
+        <section class="settings-card danger">
+          <h2>清空</h2>
+          <p class="muted">删除这台设备上的全部泡泡和天气。建议先导出。</p>
+          <div class="button-row">
+            <button id="clearData" class="btn danger-btn">清空全部数据</button>
+          </div>
+        </section>
+      </div>
+    </section>
+  </div>
+
+  <div id="dayOverlay" class="overlay hidden" role="dialog" aria-modal="true" aria-label="某一天的回忆">
+    <div id="daySceneHost" class="overlay-scene" aria-hidden="true"></div>
+    <div class="overlay-panel">
+      <header class="overlay-head">
+        <div>
+          <div id="dayTitle" class="overlay-title"></div>
+          <div id="daySub" class="overlay-sub"></div>
+          <div id="daySceneLine" class="day-scene-line"></div>
+        </div>
+        <button id="dayClose" class="icon-btn" aria-label="关闭"><svg class="icon"><use href="#i-close"></use></svg></button>
+      </header>
+      <div id="dayBody" class="overlay-body"></div>
+    </div>
+  </div>
+
+  <div id="pickerOverlay" class="sheet hidden" role="dialog" aria-modal="true" aria-label="选择天气或场景">
+    <div id="pickerBackdrop" class="sheet-backdrop"></div>
+    <div class="sheet-panel">
+      <header class="sheet-head">
+        <div class="segmented small" id="pickerTabs">
+          <button data-tab="weather" class="active">天气</button>
+          <button data-tab="scene">场景</button>
+        </div>
+        <button id="pickerClose" class="icon-btn" aria-label="关闭"><svg class="icon"><use href="#i-close"></use></svg></button>
+      </header>
+      <div id="pickerBody" class="sheet-body"></div>
+    </div>
+  </div>
+
+  <div id="bubbleOverlay" class="overlay hidden" role="dialog" aria-modal="true" aria-label="泡泡详情">
+    <div class="overlay-panel narrow">
+      <header class="overlay-head">
+        <div id="bubbleMeta" class="overlay-sub"></div>
+        <button id="bubbleClose" class="icon-btn" aria-label="关闭"><svg class="icon"><use href="#i-close"></use></svg></button>
+      </header>
+      <div id="bubbleBody" class="overlay-body"></div>
+    </div>
+  </div>
+
+  <div id="searchOverlay" class="overlay hidden" role="dialog" aria-modal="true" aria-label="搜索">
+    <div class="overlay-panel narrow">
+      <header class="overlay-head">
+        <input id="searchInput" class="search-input" type="search" placeholder="搜索泡泡、标签…" autocomplete="off">
+        <button id="searchClose" class="icon-btn" aria-label="关闭"><svg class="icon"><use href="#i-close"></use></svg></button>
+      </header>
+      <div id="searchResults" class="overlay-body search-results"></div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
+
+  <script src="data.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
